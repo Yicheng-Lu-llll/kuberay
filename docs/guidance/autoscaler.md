@@ -3,6 +3,9 @@
 Ray Autoscaler integration is beta since KubeRay 0.3.0 and Ray 2.0.0.
 While autoscaling functionality is stable, the details of autoscaler behavior and configuration may change in future releases.
 
+
+
+
 See the [official Ray documentation](https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/configuring-autoscaling.html) for even more information about Ray autoscaling on Kubernetes.
 
 ### Prerequisite      
