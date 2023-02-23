@@ -5,7 +5,9 @@ While autoscaling functionality is stable, the details of autoscaler behavior an
 
 See the [official Ray documentation](https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/configuring-autoscaling.html) for even more information about Ray autoscaling on Kubernetes.
 
-### Prerequisite
+### Prerequisite 
+
+
 
 Start by deploying the latest stable version of the KubeRay operator:
 ```
