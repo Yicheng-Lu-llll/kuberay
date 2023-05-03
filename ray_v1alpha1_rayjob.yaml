@@ -1,0 +1,125 @@
+apiVersion: ray.io/v1alpha1
+kind: RayJob
+metadata:
+  name: rayjob-sample
+spec:
+  entrypoint: python /home/ray/samples/sample_code.py
+  # runtimeEnv decoded to '{
+  #    "pip": [
+  #        "requests==2.26.0",
+  #        "pendulum==2.1.2"
+  #    ],
+  #    "env_vars": {
+  #        "counter_name": "test_counter"
+  #    }
+  #}'
+  runtimeEnv: ewogICAgInBpcCI6IFsKICAgICAgICAicmVxdWVzdHM9PTIuMjYuMCIsCiAgICAgICAgInBlbmR1bHVtPT0yLjEuMiIKICAgIF0sCiAgICAiZW52X3ZhcnMiOiB7ImNvdW50ZXJfbmFtZSI6ICJ0ZXN0X2NvdW50ZXIifQp9Cg==
+  rayClusterSpec:
+    rayVersion: '2.4.0' # should match the Ray version in the image of the containers
+    # Ray head pod template
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+      imagePullPolicy: IfNotPresent
+      resources:
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+        requests:
+          cpu: "500m"
+          memory: "512Mi"    
+    headGroupSpec:
+      # the following params are used to complete the ray start: ray start --head --block --redis-port=6379 ...
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+        num-cpus: '1' # can be auto-completed from the limits
+      #pod template
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.4.0
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265 # Ray dashboard
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              resources:
+                limits:
+                  cpu: "1"
+                requests:
+                  cpu: "200m"
+              volumeMounts:
+                - mountPath: /home/ray/samples
+                  name: code-sample
+          volumes:
+            # You set volumes at the Pod level, then mount them into containers inside that Pod
+            - name: code-sample
+              configMap:
+                # Provide the name of the ConfigMap you want to mount.
+                name: ray-job-code-sample
+                # An array of keys from the ConfigMap to create as files
+                items:
+                  - key: sample_code.py
+                    path: sample_code.py
+    workerGroupSpecs:
+      # the pod replicas in this group typed worker
+      - replicas: 1
+        minReplicas: 1
+        maxReplicas: 5
+        # logical group name, for this called small-group, also can be functional
+        groupName: small-group
+        rayStartParams: {}
+        #pod template
+        template:
+          spec:
+            containers:
+              - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
+                image: rayproject/ray:2.4.0
+                lifecycle:
+                  preStop:
+                    exec:
+                      command: [ "/bin/sh","-c","ray stop" ]
+                resources:
+                  limits:
+                    cpu: "1"
+                  requests:
+                    cpu: "200m"
+######################Ray code sample#################################
+# this sample is from https://docs.ray.io/en/latest/cluster/job-submission.html#quick-start-example
+# it is mounted into the container and executed to show the Ray job at work
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ray-job-code-sample
+data:
+  sample_code.py: |
+    from pprint import pprint
+    import time
+
+    # Import placement group APIs.
+    from ray.util.placement_group import (
+        placement_group,
+        placement_group_table,
+        remove_placement_group,
+    )
+    from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
+
+    # Initialize Ray.
+    import ray
+
+    ray.init()
+
+
+    pg = placement_group([{"CPU": 1} for i in range(3)])
+    ray.get(pg.ready(), timeout=10)
+    print(placement_group_table(pg))
+    while(True):
+        time.sleep(1)
+        print("sleeping")
