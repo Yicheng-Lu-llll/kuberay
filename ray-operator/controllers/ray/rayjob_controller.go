@@ -186,13 +186,13 @@ func (r *RayJobReconciler) Reconcile(ctx context.Context, request ctrl.Request) 
 			break
 		}
 
-		job := &batchv1.Job{}
 		if rayJobInstance.Spec.SubmissionMode == rayv1.K8sJobMode {
 			// If the submitting Kubernetes Job reaches the backoff limit, transition the status to `Complete`. This is because,
 			// beyond this point, it becomes impossible for the submitter to submit any further Ray jobs. For light-weight mode,
 			// we don't transition the status to `Complete` based on the number of failed requests. Instead, users can use the
 			// `ActiveDeadlineSeconds` to ensure that the RayJob in the light-weight mode is not stuck in the `Running` status
 			// indefinitely.
+			job := &batchv1.Job{}
 			namespacedName := getK8sJobNamespacedName(rayJobInstance)
 			if err := r.Client.Get(ctx, namespacedName, job); err != nil {
 				r.Log.Error(err, "Failed to get the submitter Kubernetes Job", "NamespacedName", namespacedName)
@@ -234,16 +234,9 @@ func (r *RayJobReconciler) Reconcile(ctx context.Context, request ctrl.Request) 
 		// as "Complete" to avoid unnecessary reconciliation.
 		jobDeploymentStatus := rayv1.JobDeploymentStatusRunning
 		if rayv1.IsJobTerminal(jobInfo.JobStatus) {
-			switch rayJobInstance.Spec.SubmissionMode {
-			case rayv1.HTTPMode:
-				jobDeploymentStatus = rayv1.JobDeploymentStatusComplete
-			case rayv1.K8sJobMode:
-				if _, finished := utils.IsJobFinished(job); finished {
-					r.Log.Info("The submitter Kubernetes Job is finished", "RayJob", rayJobInstance.Name, "Kubernetes Job", job.Name)
-					jobDeploymentStatus = rayv1.JobDeploymentStatusComplete
-				}
-			}
+			jobDeploymentStatus = rayv1.JobDeploymentStatusComplete
 		}
+
 		// Always update RayClusterStatus along with JobStatus and JobDeploymentStatus updates.
 		rayJobInstance.Status.RayClusterStatus = rayClusterInstance.Status
 		rayJobInstance.Status.JobStatus = jobInfo.JobStatus

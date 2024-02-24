@@ -223,24 +223,6 @@ var _ = Context("RayJob in K8sJobMode", func() {
 			fakeRayDashboardClient.GetJobInfoMock.Store(&getJobInfo)
 			defer fakeRayDashboardClient.GetJobInfoMock.Store(nil)
 
-			// RayJob transitions to Complete if and only if the corresponding submitter Kubernetes Job is Complete or Failed.
-			Consistently(
-				getRayJobDeploymentStatus(ctx, rayJob),
-				time.Second*3, time.Millisecond*500).Should(Equal(rayv1.JobDeploymentStatusRunning), "JobDeploymentStatus = %v", rayJob.Status.JobDeploymentStatus)
-
-			// Update the submitter Kubernetes Job to Complete.
-			namespacedName := getK8sJobNamespacedName(rayJob)
-			job := &batchv1.Job{}
-			err := k8sClient.Get(ctx, namespacedName, job)
-			Expect(err).NotTo(HaveOccurred(), "failed to get Kubernetes Job")
-
-			// Update the submitter Kubernetes Job to Complete.
-			conditions := []batchv1.JobCondition{
-				{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
-			}
-			job.Status.Conditions = conditions
-			Expect(k8sClient.Status().Update(ctx, job)).Should(BeNil())
-
 			// RayJob transitions to Complete.
 			Eventually(
 				getRayJobDeploymentStatus(ctx, rayJob),

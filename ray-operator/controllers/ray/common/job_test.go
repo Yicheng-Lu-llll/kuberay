@@ -62,7 +62,7 @@ pip: ["python-multipart==0.0.6"]
 }
 
 func TestGetBaseRayJobCommand(t *testing.T) {
-	expected := []string{"ray", "job", "submit", "--address", "http://127.0.0.1:8265"}
+	expected := []string{"ray", "job", "submit", "--no-wait", "--address", "http://127.0.0.1:8265"}
 	command := GetBaseRayJobCommand(testRayJob.Status.DashboardURL)
 	assert.Equal(t, expected, command)
 }
@@ -76,7 +76,7 @@ func TestGetMetadataJson(t *testing.T) {
 
 func TestGetK8sJobCommand(t *testing.T) {
 	expected := []string{
-		"ray", "job", "submit", "--address", "http://127.0.0.1:8265",
+		"ray", "job", "submit", "--no-wait", "--address", "http://127.0.0.1:8265",
 		"--runtime-env-json", `{"test":"test"}`,
 		"--metadata-json", `{"testKey":"testValue"}`,
 		"--submission-id", "testJobId",
@@ -112,7 +112,7 @@ pip: ["python-multipart==0.0.6"]
 		},
 	}
 	expected := []string{
-		"ray", "job", "submit", "--address", "http://127.0.0.1:8265",
+		"ray", "job", "submit", "--no-wait", "--address", "http://127.0.0.1:8265",
 		"--runtime-env-json", `{"working_dir":"https://github.com/ray-project/serve_config_examples/archive/b393e77bbd6aba0881e3d94c05f968f05a387b96.zip","pip":["python-multipart==0.0.6"]}`,
 		"--metadata-json", `{"testKey":"testValue"}`,
 		"--submission-id", "testJobId",

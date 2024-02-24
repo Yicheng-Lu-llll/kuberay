@@ -150,4 +150,4 @@ data:
         print(ray.get(counter.get_counter.remote()))
 
     # Verify that the correct runtime env was used for the job.
-    assert requests.__version__ == "2.26.0"
+    assert requests.__version__ == "2.26.0cdwefragregsr5egtetgertgertg"

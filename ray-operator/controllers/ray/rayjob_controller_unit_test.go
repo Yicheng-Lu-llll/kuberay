@@ -162,12 +162,12 @@ func TestGetSubmitterTemplate(t *testing.T) {
 	rayJobInstanceWithTemplate.Spec.SubmitterPodTemplate.Spec.Containers[utils.RayContainerIndex].Command = []string{}
 	submitterTemplate, err = r.getSubmitterTemplate(rayJobInstanceWithTemplate, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"ray", "job", "submit", "--address", "http://test-url", "--submission-id", "test-job-id", "--", "echo", "hello", "world"}, submitterTemplate.Spec.Containers[utils.RayContainerIndex].Command)
+	assert.Equal(t, []string{"ray", "job", "submit", "--no-wait", "--address", "http://test-url", "--submission-id", "test-job-id", "--", "echo", "hello", "world"}, submitterTemplate.Spec.Containers[utils.RayContainerIndex].Command)
 
 	// Test 3: User did not provide template, should use the image of the Ray Head
 	submitterTemplate, err = r.getSubmitterTemplate(rayJobInstanceWithoutTemplate, rayClusterInstance)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"ray", "job", "submit", "--address", "http://test-url", "--submission-id", "test-job-id", "--", "echo", "hello", "world"}, submitterTemplate.Spec.Containers[utils.RayContainerIndex].Command)
+	assert.Equal(t, []string{"ray", "job", "submit", "--no-wait", "--address", "http://test-url", "--submission-id", "test-job-id", "--", "echo", "hello", "world"}, submitterTemplate.Spec.Containers[utils.RayContainerIndex].Command)
 	assert.Equal(t, "rayproject/ray:custom-version", submitterTemplate.Spec.Containers[utils.RayContainerIndex].Image)
 
 	// Test 4: Check default PYTHONUNBUFFERED setting

@@ -37,7 +37,7 @@ func GetBaseRayJobCommand(address string) []string {
 	if !strings.HasPrefix(address, "http://") {
 		address = "http://" + address
 	}
-	return []string{"ray", "job", "submit", "--address", address}
+	return []string{"ray", "job", "submit", "--no-wait", "--address", address}
 }
 
 // GetMetadataJson returns the JSON string of the metadata for the Ray job.
