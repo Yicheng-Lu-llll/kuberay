@@ -302,7 +302,7 @@ func initLivenessAndReadinessProbe(rayContainer *corev1.Container, rayNodeType r
 }
 
 // BuildPod a pod config
-func BuildPod(ctx context.Context, podTemplateSpec corev1.PodTemplateSpec, rayNodeType rayv1.RayNodeType, rayStartParams map[string]string, headPort string, enableRayAutoscaler *bool, creatorCRDType utils.CRDType, fqdnRayIP string) (aPod corev1.Pod) {
+func BuildPod(ctx context.Context, podTemplateSpec corev1.PodTemplateSpec, rayNodeType rayv1.RayNodeType, rayStartParams map[string]string, headPort string, enableRayAutoscaler *bool, creatorCRDType utils.CRDType, fqdnRayIP string, expectedRayNodes int) (aPod corev1.Pod) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// For Worker Pod: Traffic readiness is determined by the readiness probe.
@@ -376,7 +376,7 @@ func BuildPod(ctx context.Context, podTemplateSpec corev1.PodTemplateSpec, rayNo
 	for index := range pod.Spec.InitContainers {
 		setInitContainerEnvVars(&pod.Spec.InitContainers[index], fqdnRayIP)
 	}
-	setContainerEnvVars(&pod, rayNodeType, rayStartParams, fqdnRayIP, headPort, rayStartCmd, creatorCRDType)
+	setContainerEnvVars(&pod, rayNodeType, rayStartParams, fqdnRayIP, headPort, rayStartCmd, creatorCRDType, expectedRayNodes)
 
 	// Inject probes into the Ray containers if the user has not explicitly disabled them.
 	// The feature flag `ENABLE_PROBES_INJECTION` will be removed if this feature is stable enough.
@@ -549,7 +549,7 @@ func setInitContainerEnvVars(container *corev1.Container, fqdnRayIP string) {
 	)
 }
 
-func setContainerEnvVars(pod *corev1.Pod, rayNodeType rayv1.RayNodeType, rayStartParams map[string]string, fqdnRayIP string, headPort string, rayStartCmd string, creatorCRDType utils.CRDType) {
+func setContainerEnvVars(pod *corev1.Pod, rayNodeType rayv1.RayNodeType, rayStartParams map[string]string, fqdnRayIP string, headPort string, rayStartCmd string, creatorCRDType utils.CRDType, expectedRayNodes int) {
 	// TODO: Audit all environment variables to identify which should not be modified by users.
 	container := &pod.Spec.Containers[utils.RayContainerIndex]
 	if container.Env == nil || len(container.Env) == 0 {
@@ -566,6 +566,36 @@ func setContainerEnvVars(pod *corev1.Pod, rayNodeType rayv1.RayNodeType, rayStar
 			// RAY_IP is deprecated and should be kept for backward compatibility purposes only.
 			corev1.EnvVar{Name: utils.RAY_IP, Value: utils.ExtractRayIPFromFQDN(ip)},
 		)
+	}
+
+	if rayNodeType == rayv1.HeadNode {
+		expectedRayNodesEnv := corev1.EnvVar{
+			Name:  utils.EXPECTED_RAY_NODES,
+			Value: strconv.Itoa(expectedRayNodes),
+		}
+		container.Env = append(container.Env, expectedRayNodesEnv)
+
+		waitForRayNodesCmds := fmt.Sprintf(
+			`while true; do 
+				ACTIVE_NODES=$(ray status | awk '/Active:/,/Pending:/' | grep -E 'node_' | wc -l);
+				NODES_LEFT=$(( %[1]d - ACTIVE_NODES )); 
+				if [ "$ACTIVE_NODES" -ge %[1]d ]; then 
+					echo "Reached %[1]d active nodes."; 
+					break; 
+				else 
+					echo "$ACTIVE_NODES nodes active, waiting for $NODES_LEFT more."; 
+				fi; 
+				sleep 5; 
+			done`,
+			expectedRayNodes,
+		)
+
+		waitForRayNodesEnv := corev1.EnvVar{
+			Name:  utils.KUBERAY_GEN_WAIT_FOR_RAY_NODES_CMDS,
+			Value: waitForRayNodesCmds,
+		}
+
+		container.Env = append(container.Env, waitForRayNodesEnv)
 	}
 
 	// The RAY_CLUSTER_NAME environment variable is managed by KubeRay and should not be set by the user.
@@ -710,8 +740,9 @@ func setMissingRayStartParams(ctx context.Context, rayStartParams map[string]str
 		rayStartParams["metrics-export-port"] = fmt.Sprint(utils.DefaultMetricsPort)
 	}
 
-	// Add --block option. See https://github.com/ray-project/kuberay/pull/675
-	rayStartParams["block"] = "true"
+	if _, ok := rayStartParams["block"]; !ok {
+		rayStartParams["block"] = "true"
+	}
 
 	// Hardcode the dashboard-agent-listen-port to the default value if it is not provided. This is purely a
 	// defensive measure; Ray will already use this default value if the flag is not provided.

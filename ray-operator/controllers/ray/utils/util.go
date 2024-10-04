@@ -569,6 +569,15 @@ func EnvVarByName(envName string, envVars []corev1.EnvVar) (corev1.EnvVar, bool)
 	return corev1.EnvVar{}, false
 }
 
+func GetNumOfRayNodes(instance rayv1.RayCluster) int {
+	numOfRayNodes := 0
+	for _, workerGroup := range instance.Spec.WorkerGroupSpecs {
+		numOfRayNodes += int(*workerGroup.Replicas)
+	}
+	// Add the head node.
+	return numOfRayNodes + 1
+}
+
 type ClientProvider interface {
 	GetDashboardClient(mgr manager.Manager) func() RayDashboardClientInterface
 	GetHttpProxyClient(mgr manager.Manager) func() RayHttpProxyClientInterface
